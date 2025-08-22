@@ -1,0 +1,48 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f8fafc;
+}
+
+#map {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.states {
+    fill: #e5e7eb;
+    stroke: #ffffff;
+    stroke-width: 1px;
+    cursor: pointer;
+    transition: fill 0.2s ease;
+}
+
+.states:hover {
+    fill: #d1d5db;
+}
+
+.state-borders {
+    fill: none;
+    stroke: #9ca3af;
+    stroke-width: 0.5px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    pointer-events: none;
+}
+
+#tooltip {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+}
