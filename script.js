@@ -55,39 +55,38 @@ const stateAbbrevToName = {
 let customerData = [];
 let stateCounts = {};
 
+// Helper functions
+function getStateInfo(stateId) {
+    const stateName = stateNames[stateId] || "Unknown";
+    const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
+        stateAbbrevToName[key] === stateName
+    );
+    const count = stateCounts[stateAbbrev] || 0;
+    return { stateName, stateAbbrev, count };
+}
+
+function getStateColor(count) {
+    return count > 0 ? "#328CFF" : "#f1f5f9";
+}
+
 // Update state colors based on customer data
 function updateStateColors() {
-    console.log('updateStateColors called');
-    svg.selectAll("path")
+    svg.selectAll(".states")
         .attr("fill", function(d) {
             if (!d || !d.id) return "#f1f5f9";
-            
-            const stateName = stateNames[d.id] || "Unknown";
-            const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
-                stateAbbrevToName[key] === stateName
-            );
-            const count = stateCounts[stateAbbrev] || 0;
-            const color = count > 0 ? "#328CFF" : "#f1f5f9";
-            console.log(`State: ${stateName} (${stateAbbrev}) - Count: ${count} - Color: ${color}`);
-            return color;
+            const { count } = getStateInfo(d.id);
+            return getStateColor(count);
         });
 }
 
 // Add customer pins to the map using actual lat/lng coordinates
 function addCustomerPins() {
-    // Filter customers that have valid lat/lng coordinates
     const validCustomers = customerData.filter(d => 
-        d.lat !== null && 
-        d.lng !== null && 
-        d.lat !== undefined && 
-        d.lng !== undefined &&
-        !isNaN(d.lat) && 
-        !isNaN(d.lng)
+        d.lat !== null && d.lng !== null && 
+        d.lat !== undefined && d.lng !== undefined &&
+        !isNaN(d.lat) && !isNaN(d.lng)
     );
     
-    console.log(`Adding ${validCustomers.length} customer pins with valid coordinates`);
-    
-    // Add customer pins using actual coordinates
     svg.selectAll(".customer-pin")
         .data(validCustomers)
         .enter().append("circle")
@@ -109,15 +108,12 @@ function addCustomerPins() {
 }
 
 // Load customer data
-function loadCustomerData() {
-    return new Promise(async (resolve) => {
+async function loadCustomerData() {
     try {
-        console.log('Loading customer data...');
         const response = await fetch('./map.json');
         const data = await response.json();
         
         customerData = data;
-        console.log(`Loaded ${customerData.length} customers`);
         
         // Calculate state counts
         stateCounts = customerData.reduce((counts, customer) => {
@@ -127,26 +123,16 @@ function loadCustomerData() {
             return counts;
         }, {});
         
-        console.log('State counts:', stateCounts);
-        
-        // Add customer pins to map
         addCustomerPins();
         
-        // Update state colors after data loads (only if map exists)
+        // Update state colors if map exists
         if (d3.selectAll(".states").size() > 0) {
-            console.log('Updating state colors...');
             updateStateColors();
-        } else {
-            console.log('Map not ready yet, will update colors when map loads');
         }
-        
-        resolve();
         
     } catch (error) {
         console.error('Error loading customer data:', error);
-        resolve();
     }
-    });
 }
 
 // Load US map data
@@ -161,11 +147,7 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
         .attr("class", "states")
         .attr("fill", "#f1f5f9")
         .on("mouseover", function(event, d) {
-            const stateName = stateNames[d.id] || "Unknown";
-            const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
-                stateAbbrevToName[key] === stateName
-            );
-            const count = stateCounts[stateAbbrev] || 0;
+            const { stateName, count } = getStateInfo(d.id);
             
             // Change state color on hover only if state has customers
             if (count > 0) {
@@ -184,29 +166,18 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
                 .style("top", (event.pageY - 10) + "px");
         })
         .on("mouseout", function(event, d) {
-            // Restore original state color
-            const stateName = stateNames[d.id] || "Unknown";
-            const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
-                stateAbbrevToName[key] === stateName
-            );
-            const count = stateCounts[stateAbbrev] || 0;
-            const originalColor = count > 0 ? "#328CFF" : "#f1f5f9";
-            d3.select(this).attr("fill", originalColor);
-            
+            const { count } = getStateInfo(d.id);
+            d3.select(this).attr("fill", getStateColor(count));
             tooltip.style("opacity", 0);
         })
         .on("click", function(event, d) {
-            const stateName = stateNames[d.id] || "Unknown";
-            const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
-                stateAbbrevToName[key] === stateName
-            );
-            const count = stateCounts[stateAbbrev] || 0;
+            const { stateName, count } = getStateInfo(d.id);
             
             // Highlight selected state
             updateStateColors();
             d3.select(this).attr("fill", "#1e40af");
             
-            // Optional: Emit custom event for parent frame
+            // Emit event for parent frame
             if (window.parent !== window) {
                 window.parent.postMessage({
                     type: 'stateSelected',
@@ -225,9 +196,8 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
     
     // Load customer data after map is ready
     loadCustomerData().then(() => {
-        // Update colors again after both map and data are ready
+        // Update colors after both map and data are ready
         if (Object.keys(stateCounts).length > 0) {
-            console.log('Both map and data ready, updating colors...');
             updateStateColors();
         }
     });
