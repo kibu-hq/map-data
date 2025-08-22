@@ -81,11 +81,17 @@ function updateStateColors() {
 
 // Add customer pins to the map using actual lat/lng coordinates
 function addCustomerPins() {
-    const validCustomers = customerData.filter(d => 
-        d.lat !== null && d.lng !== null && 
-        d.lat !== undefined && d.lng !== undefined &&
-        !isNaN(d.lat) && !isNaN(d.lng)
-    );
+    const validCustomers = customerData.filter(d => {
+        if (d.lat === null || d.lng === null || 
+            d.lat === undefined || d.lng === undefined ||
+            isNaN(d.lat) || isNaN(d.lng)) {
+            return false;
+        }
+        
+        // Also filter out coordinates that don't project properly
+        const projected = projection([d.lng, d.lat]);
+        return projected !== null;
+    });
     
     svg.selectAll(".customer-pin")
         .data(validCustomers)
@@ -93,11 +99,11 @@ function addCustomerPins() {
         .attr("class", "customer-pin")
         .attr("cx", d => {
             const projected = projection([d.lng, d.lat]);
-            return projected ? projected[0] : 0;
+            return projected[0];
         })
         .attr("cy", d => {
             const projected = projection([d.lng, d.lat]);
-            return projected ? projected[1] : 0;
+            return projected[1];
         })
         .attr("r", 3)
         .attr("fill", "#ffffff")
