@@ -2,7 +2,7 @@ body {
     margin: 0;
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f8fafc;
+    background-color: #ffffff;
 }
 
 #map {
@@ -14,16 +14,12 @@ body {
 }
 
 .states {
-    fill: #e5e7eb;
     stroke: #ffffff;
-    stroke-width: 1px;
+    stroke-width: 1.5px;
     cursor: pointer;
-    transition: fill 0.2s ease;
+    transition: all 0.3s ease;
 }
 
-.states:hover {
-    fill: #d1d5db;
-}
 
 .state-borders {
     fill: none;
