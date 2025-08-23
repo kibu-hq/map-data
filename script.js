@@ -66,6 +66,20 @@ const smallStatesConfig = [
     { id: "11", abbrev: "DC", name: "District of Columbia", labelOffset: { x: 60, y: 75 } }
 ];
 
+// Configuration for tooltip and hover behavior
+const tooltipConfig = {
+    offset: {
+        default: { x: 10, y: -10 },
+        callout: { x: -120, y: -10 }
+    },
+    colors: {
+        primary: "#328CFF",
+        hover: "#005EFF", 
+        selected: "#1e40af",
+        default: "#f1f5f9"
+    }
+};
+
 // Helper functions
 function getStateInfo(stateId) {
     const stateName = stateNames[stateId] || "Unknown";
@@ -77,7 +91,60 @@ function getStateInfo(stateId) {
 }
 
 function getStateColor(count) {
-    return count > 0 ? "#328CFF" : "#f1f5f9";
+    return count > 0 ? tooltipConfig.colors.primary : tooltipConfig.colors.default;
+}
+
+// Centralized tooltip content generation
+function generateTooltipContent(stateName, count) {
+    return `<strong>${stateName}</strong><br/>${count} customer${count !== 1 ? 's' : ''}`;
+}
+
+// Unified hover behavior for states and callouts
+function createHoverBehavior(element, stateId, isCallout = false) {
+    const offset = isCallout ? tooltipConfig.offset.callout : tooltipConfig.offset.default;
+    
+    element
+        .on("mouseover", function(event) {
+            const { stateName, count } = getStateInfo(stateId);
+            
+            // Highlight the actual state path
+            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
+            if (count > 0) {
+                statePath.attr("fill", tooltipConfig.colors.hover);
+            }
+            
+            // Change callout background if this is a callout
+            if (isCallout && count > 0) {
+                d3.select(this).select("rect").attr("fill", tooltipConfig.colors.hover);
+            }
+            
+            // Show tooltip
+            tooltip
+                .style("opacity", 1)
+                .html(generateTooltipContent(stateName, count))
+                .style("left", (event.pageX + offset.x) + "px")
+                .style("top", (event.pageY + offset.y) + "px");
+        })
+        .on("mousemove", function(event) {
+            tooltip
+                .style("left", (event.pageX + offset.x) + "px")
+                .style("top", (event.pageY + offset.y) + "px");
+        })
+        .on("mouseout", function(event) {
+            const { count } = getStateInfo(stateId);
+            
+            // Reset state color
+            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
+            statePath.attr("fill", getStateColor(count));
+            
+            // Reset callout background if this is a callout
+            if (isCallout) {
+                d3.select(this).select("rect").attr("fill", count > 0 ? tooltipConfig.colors.primary : "white");
+            }
+            
+            // Hide tooltip
+            tooltip.style("opacity", 0);
+        });
 }
 
 // Update state colors based on customer data
@@ -200,47 +267,8 @@ function drawCallouts(svg, states, projection) {
             .attr("pointer-events", "all")
             .style("cursor", "pointer");
         
-        // Add hover events to label group
-        labelGroup
-            .on("mouseover", function(event) {
-                const { stateName, count } = getStateInfo(config.id);
-                
-                // Highlight the actual state path
-                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
-                if (count > 0) {
-                    statePath.attr("fill", "#005EFF");
-                }
-                
-                // Change callout background to darker blue on hover (if it has customers)
-                if (count > 0) {
-                    d3.select(this).select("rect").attr("fill", "#005EFF");
-                }
-                
-                // Show tooltip positioned to the left of mouse for callouts
-                tooltip
-                    .style("opacity", 1)
-                    .html(`<strong>${stateName}</strong><br/>${count} customer${count !== 1 ? 's' : ''}`)
-                    .style("left", (event.pageX - 120) + "px")
-                    .style("top", (event.pageY - 10) + "px");
-            })
-            .on("mousemove", function(event) {
-                tooltip
-                    .style("left", (event.pageX - 120) + "px")
-                    .style("top", (event.pageY - 10) + "px");
-            })
-            .on("mouseout", function(event) {
-                const { count } = getStateInfo(config.id);
-                
-                // Reset state color
-                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
-                statePath.attr("fill", getStateColor(count));
-                
-                // Reset callout background color
-                d3.select(this).select("rect").attr("fill", count > 0 ? "#328CFF" : "white");
-                
-                // Hide tooltip
-                tooltip.style("opacity", 0);
-            });
+        // Add hover events using unified behavior
+        createHoverBehavior(labelGroup, config.id, true);
         
         // Add click handler separately to avoid closure issues
         labelGroup.on("click", function(event) {
@@ -249,7 +277,7 @@ function drawCallouts(svg, states, projection) {
             // Highlight selected state
             updateStateColors();
             const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
-            statePath.attr("fill", "#1e40af");
+            statePath.attr("fill", tooltipConfig.colors.selected);
             
             // Emit event for parent frame
             if (window.parent !== window) {
@@ -308,36 +336,15 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
         .attr("d", path)
         .attr("class", "states")
         .attr("fill", "#f1f5f9")
-        .on("mouseover", function(event, d) {
-            const { stateName, count } = getStateInfo(d.id);
-            
-            // Change state color on hover only if state has customers
-            if (count > 0) {
-                d3.select(this).attr("fill", "#005EFF");
-            }
-            
-            tooltip
-                .style("opacity", 1)
-                .html(`<strong>${stateName}</strong><br/>${count} customer${count !== 1 ? 's' : ''}`)
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 10) + "px");
-        })
-        .on("mousemove", function(event) {
-            tooltip
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 10) + "px");
-        })
-        .on("mouseout", function(event, d) {
-            const { count } = getStateInfo(d.id);
-            d3.select(this).attr("fill", getStateColor(count));
-            tooltip.style("opacity", 0);
+        .each(function(d) {
+            createHoverBehavior(d3.select(this), d.id, false);
         })
         .on("click", function(event, d) {
             const { stateName, count } = getStateInfo(d.id);
             
             // Highlight selected state
             updateStateColors();
-            d3.select(this).attr("fill", "#1e40af");
+            d3.select(this).attr("fill", tooltipConfig.colors.selected);
             
             // Emit event for parent frame
             if (window.parent !== window) {
