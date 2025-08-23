@@ -55,6 +55,17 @@ const stateAbbrevToName = {
 let customerData = [];
 let stateCounts = {};
 
+// Configuration for small East Coast states that need callout labels
+const smallStatesConfig = [
+    { id: "25", abbrev: "MA", name: "Massachusetts", labelOffset: { x: 60, y: -45 } },
+    { id: "44", abbrev: "RI", name: "Rhode Island", labelOffset: { x: 62, y: -20 } },
+    { id: "09", abbrev: "CT", name: "Connecticut", labelOffset: { x: 65, y: 10 } },
+    { id: "34", abbrev: "NJ", name: "New Jersey", labelOffset: { x: 75, y: 15 } },
+    { id: "10", abbrev: "DE", name: "Delaware", labelOffset: { x: 55, y: 22 } },
+    { id: "24", abbrev: "MD", name: "Maryland", labelOffset: { x: 65, y: 49 } },
+    { id: "11", abbrev: "DC", name: "District of Columbia", labelOffset: { x: 60, y: 75 } }
+];
+
 // Helper functions
 function getStateInfo(stateId) {
     const stateName = stateNames[stateId] || "Unknown";
@@ -111,6 +122,151 @@ function addCustomerPins() {
         .attr("stroke-width", 1)
         .style("opacity", 0.95)
         .style("pointer-events", "none");
+}
+
+// Update callout colors based on customer data
+function updateCalloutColors() {
+    svg.selectAll(".callout-label").each(function() {
+        const stateId = d3.select(this).attr("data-state-id");
+        const { count } = getStateInfo(stateId);
+        const hasCustomers = count > 0;
+        
+        d3.select(this).select("rect")
+            .attr("fill", hasCustomers ? "#328CFF" : "white")
+            .attr("stroke", hasCustomers ? "#328CFF" : "#ccc");
+            
+        d3.select(this).select("text")
+            .attr("fill", hasCustomers ? "white" : "#333");
+    });
+}
+
+// Draw callout labels for small East Coast states
+function drawCallouts(svg, states, projection) {
+    const calloutsGroup = svg.append("g").attr("class", "callouts");
+    
+    smallStatesConfig.forEach(config => {
+        // Find the state feature
+        const stateFeature = states.find(d => d.id === config.id);
+        if (!stateFeature) return;
+        
+        // Calculate state centroid
+        const centroid = path.centroid(stateFeature);
+        if (!centroid || isNaN(centroid[0]) || isNaN(centroid[1])) return;
+        
+        // Calculate label position
+        const labelX = centroid[0] + config.labelOffset.x;
+        const labelY = centroid[1] + config.labelOffset.y;
+        
+        // Draw leader line
+        calloutsGroup.append("line")
+            .attr("class", "leader-line")
+            .attr("x1", centroid[0])
+            .attr("y1", centroid[1])
+            .attr("x2", labelX)
+            .attr("y2", labelY)
+            .attr("stroke", "#666")
+            .attr("stroke-width", 1)
+            .attr("stroke-dasharray", "2,2");
+        
+        // Draw label background (optional rounded rectangle)
+        const labelGroup = calloutsGroup.append("g")
+            .attr("class", "callout-label")
+            .attr("data-state-id", config.id);
+        
+        const labelText = labelGroup.append("text")
+            .attr("x", labelX)
+            .attr("y", labelY)
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "central")
+            .attr("font-size", "12px")
+            .attr("font-weight", "600")
+            .attr("pointer-events", "all")
+            .style("cursor", "pointer")
+            .text(config.abbrev);
+        
+        // Add background rectangle for better visibility
+        const bbox = labelText.node().getBBox();
+        const padding = 4;
+        
+        const labelRect = labelGroup.insert("rect", "text")
+            .attr("x", bbox.x - padding)
+            .attr("y", bbox.y - padding)
+            .attr("width", bbox.width + 2 * padding)
+            .attr("height", bbox.height + 2 * padding)
+            .attr("rx", 3)
+            .attr("fill", "white")
+            .attr("stroke", "#ccc")
+            .attr("stroke-width", 1)
+            .attr("pointer-events", "all")
+            .style("cursor", "pointer");
+        
+        // Add hover events to label group
+        labelGroup
+            .on("mouseover", function(event) {
+                const { stateName, count } = getStateInfo(config.id);
+                
+                // Highlight the actual state path
+                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
+                if (count > 0) {
+                    statePath.attr("fill", "#005EFF");
+                }
+                
+                // Change callout background to darker blue on hover (if it has customers)
+                if (count > 0) {
+                    d3.select(this).select("rect").attr("fill", "#005EFF");
+                }
+                
+                // Show tooltip positioned to the left of mouse for callouts
+                tooltip
+                    .style("opacity", 1)
+                    .html(`<strong>${stateName}</strong><br/>${count} customer${count !== 1 ? 's' : ''}`)
+                    .style("left", (event.pageX - 120) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            })
+            .on("mousemove", function(event) {
+                tooltip
+                    .style("left", (event.pageX - 120) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            })
+            .on("mouseout", function(event) {
+                const { count } = getStateInfo(config.id);
+                
+                // Reset state color
+                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
+                statePath.attr("fill", getStateColor(count));
+                
+                // Reset callout background color
+                d3.select(this).select("rect").attr("fill", count > 0 ? "#328CFF" : "white");
+                
+                // Hide tooltip
+                tooltip.style("opacity", 0);
+            });
+        
+        // Add click handler separately to avoid closure issues
+        labelGroup.on("click", function(event) {
+            const { stateName, count } = getStateInfo(config.id);
+            
+            // Highlight selected state
+            updateStateColors();
+            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
+            statePath.attr("fill", "#1e40af");
+            
+            // Emit event for parent frame
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'stateSelected',
+                    state: stateName,
+                    stateId: config.id,
+                    customerCount: count
+                }, '*');
+            }
+        });
+        
+        // Update callout colors after creating the callout
+        setTimeout(() => {
+            updateCalloutColors();
+        }, 100);
+    });
 }
 
 // Load customer data
@@ -200,11 +356,15 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
         .attr("class", "state-borders")
         .attr("d", path);
     
+    // Draw callouts for small East Coast states
+    drawCallouts(svg, topojson.feature(us, us.objects.states).features, projection);
+    
     // Load customer data after map is ready
     loadCustomerData().then(() => {
         // Update colors after both map and data are ready
         if (Object.keys(stateCounts).length > 0) {
             updateStateColors();
+            updateCalloutColors();
         }
     });
 });
