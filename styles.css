@@ -42,6 +42,11 @@ body {
     transition: all 0.3s ease;
 }
 
+.customer-pin {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
 #tooltip {
     position: absolute;
     background-color: rgba(0, 0, 0, 0.8);
@@ -53,4 +58,6 @@ body {
     opacity: 0;
     transition: opacity 0.2s ease;
     z-index: 1000;
+    will-change: transform, opacity;
+    transform: translateZ(0);
 }
