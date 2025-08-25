@@ -18,6 +18,33 @@
 <body>
     <div id="map"></div>
     <div id="tooltip"></div>
+    
+    <!-- State Info Panel -->
+    <div id="state-info-panel" class="state-panel hidden">
+        <div class="panel-header">
+            <button id="close-panel" class="close-btn">&times;</button>
+            <div class="state-title">
+                <span class="state-emoji"></span>
+                <h2 class="state-name"></h2>
+            </div>
+            <div class="customer-count">
+                <span class="count-number"></span>
+                <span class="count-label">Kibu customers</span>
+            </div>
+        </div>
+        
+        <div class="panel-content">
+            <div class="customer-stories-section">
+                <h3>Customer Stories</h3>
+                <div class="stories-list"></div>
+            </div>
+            
+            <div class="resources-section">
+                <h3>Related Resources</h3>
+                <div class="blog-links"></div>
+            </div>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>

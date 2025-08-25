@@ -2,6 +2,164 @@
 const width = 960;
 const height = 500;
 
+// Track original SVG dimensions for proper scaling
+let originalViewBox = null;
+
+// State emoji mapping for visual appeal
+const stateEmojis = {
+    "Alabama": "🏈", "Alaska": "🐻", "Arizona": "🌵", "Arkansas": "💎", "California": "🌴",
+    "Colorado": "🏔️", "Connecticut": "🍂", "Delaware": "🏖️", "District of Columbia": "🏛️",
+    "Florida": "🐊", "Georgia": "🍑", "Hawaii": "🌺", "Idaho": "🥔", "Illinois": "🌽",
+    "Indiana": "🏁", "Iowa": "🌾", "Kansas": "🌪️", "Kentucky": "🐎", "Louisiana": "🎷",
+    "Maine": "🦞", "Maryland": "🦀", "Massachusetts": "⚓", "Michigan": "🚗", "Minnesota": "❄️",
+    "Mississippi": "🎵", "Missouri": "🎯", "Montana": "🦬", "Nebraska": "🌽", "Nevada": "🎰",
+    "New Hampshire": "🍁", "New Jersey": "🏖️", "New Mexico": "🌶️", "New York": "🗽",
+    "North Carolina": "🏀", "North Dakota": "🛢️", "Ohio": "🏭", "Oklahoma": "🛢️",
+    "Oregon": "🌲", "Pennsylvania": "🔔", "Rhode Island": "⛵", "South Carolina": "🌴",
+    "South Dakota": "🗿", "Tennessee": "🎸", "Texas": "🤠", "Utah": "🏜️", "Vermont": "🍁",
+    "Virginia": "🏛️", "Washington": "🍎", "West Virginia": "⛰️", "Wisconsin": "🧀", "Wyoming": "🦌"
+};
+
+// Function to get customer stories for a state from actual data
+function getCustomerStoriesForState(stateName) {
+    const stateAbbrev = Object.keys(stateAbbrevToName).find(key => 
+        stateAbbrevToName[key] === stateName
+    );
+    
+    if (!stateAbbrev) return [];
+    
+    // Get customers with blog URLs for this state
+    const customersWithBlogs = customerData.filter(customer => 
+        customer.state === stateAbbrev && customer.blog_url
+    );
+    
+    // Extract blog titles from URLs and create story objects
+    return customersWithBlogs.map(customer => {
+        const urlParts = customer.blog_url.split('/');
+        const slug = urlParts[urlParts.length - 1];
+        const title = slug.replace(/-/g, ' ')
+            .replace(/customer stories /i, '')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        
+        return {
+            title: title,
+            description: "Read about how this organization uses Kibu.",
+            url: customer.blog_url
+        };
+    });
+}
+
+// State info panel functionality
+class StateInfoPanel {
+    constructor() {
+        this.panel = document.getElementById('state-info-panel');
+        this.closeBtn = document.getElementById('close-panel');
+        this.mapContainer = document.getElementById('map');
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.closeBtn.addEventListener('click', () => this.hide());
+        
+        // Close panel when clicking outside
+        document.addEventListener('click', (event) => {
+            if (this.panel.classList.contains('visible') && 
+                !this.panel.contains(event.target) && 
+                !event.target.closest('.states') && 
+                !event.target.closest('.callout-label')) {
+                this.hide();
+            }
+        });
+
+        // Close panel with Escape key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.panel.classList.contains('visible')) {
+                this.hide();
+            }
+        });
+    }
+
+    show(stateName, customerCount) {
+        // Update panel content
+        this.updateContent(stateName, customerCount);
+        
+        // Animate map to make room for panel
+        this.mapContainer.classList.add('panel-active');
+        
+        // Adjust SVG viewBox to fit better in reduced space
+        const svgElement = svg.node();
+        if (!originalViewBox) {
+            originalViewBox = svgElement.getAttribute('viewBox');
+        }
+        
+        // Show panel with animation
+        this.panel.classList.remove('hidden');
+        this.panel.classList.add('visible');
+    }
+
+    hide() {
+        this.panel.classList.remove('visible');
+        this.panel.classList.add('hidden');
+        
+        // Animate map back to full size
+        this.mapContainer.classList.remove('panel-active');
+        
+        // Restore original viewBox
+        if (originalViewBox) {
+            svg.node().setAttribute('viewBox', originalViewBox);
+        }
+        
+        // Clear selected state and reset colors
+        selectedStateId = null;
+        updateStateColors();
+    }
+
+    updateContent(stateName, customerCount) {
+        // Update state emoji and name
+        const stateEmoji = this.panel.querySelector('.state-emoji');
+        const stateNameEl = this.panel.querySelector('.state-name');
+        const countNumber = this.panel.querySelector('.count-number');
+        
+        stateEmoji.textContent = stateEmojis[stateName] || '🏛️';
+        stateNameEl.textContent = stateName;
+        countNumber.textContent = customerCount;
+
+        // Update customer stories
+        this.updateCustomerStories(stateName);
+        
+        // Update blog links
+        this.updateBlogLinks(stateName);
+    }
+
+    updateCustomerStories(stateName) {
+        const storiesList = this.panel.querySelector('.stories-list');
+        const stories = getCustomerStoriesForState(stateName);
+
+        if (stories.length === 0) {
+            storiesList.innerHTML = '<div class="empty-state">No customer stories available for this state yet.</div>';
+            return;
+        }
+
+        storiesList.innerHTML = stories.map(story => `
+            <a href="${story.url}" class="story-item" target="_blank" rel="noopener noreferrer">
+                <h4 class="story-title">${story.title}</h4>
+                <p class="story-description">${story.description}</p>
+            </a>
+        `).join('');
+    }
+
+    updateBlogLinks(stateName) {
+        // Hide the blog links section since we're now showing real customer stories
+        const resourcesSection = this.panel.querySelector('.resources-section');
+        resourcesSection.style.display = 'none';
+    }
+}
+
+// Initialize the state info panel
+const stateInfoPanel = new StateInfoPanel();
+
 // Create SVG
 const svg = d3.select("#map")
     .append("svg")
@@ -20,7 +178,6 @@ const path = d3.geoPath().projection(projection);
 
 // Tooltip
 const tooltip = d3.select("#tooltip");
-
 
 // State name mapping
 const stateNames = {
@@ -76,10 +233,15 @@ const tooltipConfig = {
     colors: {
         primary: "#328CFF",
         hover: "#005EFF", 
-        selected: "#1e40af",
-        default: "#f1f5f9"
+        selected: "#005EFF",
+        default: "#f1f5f9",
+        noCustomersHover: "#d1d5db",
+        noCustomersSelected: "#d1d5db"
     }
 };
+
+// Track currently selected state
+let selectedStateId = null;
 
 // Helper functions
 function getStateInfo(stateId) {
@@ -91,7 +253,12 @@ function getStateInfo(stateId) {
     return { stateName, stateAbbrev, count };
 }
 
-function getStateColor(count) {
+function getStateColor(count, stateId = null) {
+    // If this is the selected state, use selected colors
+    if (stateId && stateId === selectedStateId) {
+        return count > 0 ? tooltipConfig.colors.selected : tooltipConfig.colors.noCustomersSelected;
+    }
+    // Otherwise use normal colors
     return count > 0 ? tooltipConfig.colors.primary : tooltipConfig.colors.default;
 }
 
@@ -108,15 +275,24 @@ function createHoverBehavior(element, stateId, isCallout = false) {
         .on("mouseover", function(event) {
             const { stateName, count } = getStateInfo(stateId);
             
-            // Highlight the actual state path
-            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
-            if (count > 0) {
-                statePath.attr("fill", tooltipConfig.colors.hover);
-            }
-            
-            // Change callout background if this is a callout
-            if (isCallout && count > 0) {
-                d3.select(this).select("rect").attr("fill", tooltipConfig.colors.hover);
+            // Don't change color if this is the currently selected state
+            if (stateId !== selectedStateId) {
+                // Highlight the actual state path
+                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
+                if (count > 0) {
+                    statePath.attr("fill", tooltipConfig.colors.hover);
+                } else {
+                    statePath.attr("fill", tooltipConfig.colors.noCustomersHover);
+                }
+                
+                // Change callout background if this is a callout
+                if (isCallout) {
+                    if (count > 0) {
+                        d3.select(this).select("rect").attr("fill", tooltipConfig.colors.hover);
+                    } else {
+                        d3.select(this).select("rect").attr("fill", tooltipConfig.colors.noCustomersHover);
+                    }
+                }
             }
             
             // Show tooltip
@@ -134,13 +310,16 @@ function createHoverBehavior(element, stateId, isCallout = false) {
         .on("mouseout", function(event) {
             const { count } = getStateInfo(stateId);
             
-            // Reset state color
-            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
-            statePath.attr("fill", getStateColor(count));
-            
-            // Reset callout background if this is a callout
-            if (isCallout) {
-                d3.select(this).select("rect").attr("fill", count > 0 ? tooltipConfig.colors.primary : "white");
+            // Don't reset color if this is the currently selected state
+            if (stateId !== selectedStateId) {
+                // Reset state color
+                const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === stateId; });
+                statePath.attr("fill", getStateColor(count, stateId));
+                
+                // Reset callout background if this is a callout
+                if (isCallout) {
+                    d3.select(this).select("rect").attr("fill", count > 0 ? tooltipConfig.colors.primary : "white");
+                }
             }
             
             // Hide tooltip
@@ -154,7 +333,7 @@ function updateStateColors() {
         .attr("fill", function(d) {
             if (!d || !d.id) return "#f1f5f9";
             const { count } = getStateInfo(d.id);
-            return getStateColor(count);
+            return getStateColor(count, d.id);
         });
 }
 
@@ -275,10 +454,11 @@ function drawCallouts(svg, states, projection) {
         labelGroup.on("click", function(event) {
             const { stateName, count } = getStateInfo(config.id);
             
-            // Highlight selected state
+            // Update selected state
+            selectedStateId = config.id;
+            
+            // Update all state colors to reflect new selection
             updateStateColors();
-            const statePath = svg.selectAll(".states").filter(function(d) { return d && d.id === config.id; });
-            statePath.attr("fill", tooltipConfig.colors.selected);
             
             // Emit event for parent frame
             if (window.parent !== window) {
@@ -289,6 +469,9 @@ function drawCallouts(svg, states, projection) {
                     customerCount: count
                 }, '*');
             }
+            
+            // Show state info panel
+            stateInfoPanel.show(stateName, count);
         });
         
         // Update callout colors after creating the callout
@@ -348,9 +531,11 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
         .on("click", function(event, d) {
             const { stateName, count } = getStateInfo(d.id);
             
-            // Highlight selected state
+            // Update selected state
+            selectedStateId = d.id;
+            
+            // Update all state colors to reflect new selection
             updateStateColors();
-            d3.select(this).attr("fill", tooltipConfig.colors.selected);
             
             // Emit event for parent frame
             if (window.parent !== window) {
@@ -361,6 +546,9 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
                     customerCount: count
                 }, '*');
             }
+            
+            // Show state info panel
+            stateInfoPanel.show(stateName, count);
         });
     
     // Draw state borders
