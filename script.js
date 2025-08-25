@@ -21,18 +21,6 @@ const path = d3.geoPath().projection(projection);
 // Tooltip
 const tooltip = d3.select("#tooltip");
 
-// Debounce function for performance optimization
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
 
 // State name mapping
 const stateNames = {
@@ -116,13 +104,6 @@ function generateTooltipContent(stateName, count) {
 function createHoverBehavior(element, stateId, isCallout = false) {
     const offset = isCallout ? tooltipConfig.offset.callout : tooltipConfig.offset.default;
     
-    // Debounced tooltip update function
-    const debouncedTooltipMove = debounce((event) => {
-        tooltip
-            .style("left", (event.pageX + offset.x) + "px")
-            .style("top", (event.pageY + offset.y) + "px");
-    }, 16); // ~60fps
-    
     element
         .on("mouseover", function(event) {
             const { stateName, count } = getStateInfo(stateId);
@@ -145,7 +126,11 @@ function createHoverBehavior(element, stateId, isCallout = false) {
                 .style("left", (event.pageX + offset.x) + "px")
                 .style("top", (event.pageY + offset.y) + "px");
         })
-        .on("mousemove", debouncedTooltipMove)
+        .on("mousemove", function(event) {
+            tooltip
+                .style("left", (event.pageX + offset.x) + "px")
+                .style("top", (event.pageY + offset.y) + "px");
+        })
         .on("mouseout", function(event) {
             const { count } = getStateInfo(stateId);
             
@@ -223,11 +208,9 @@ function updateCalloutColors() {
     });
 }
 
-// Draw callouts for small East Coast states (lazy loaded)
+// Draw callouts for small East Coast states
 function drawCallouts(svg, states, projection) {
-    // Use requestAnimationFrame for better performance
-    requestAnimationFrame(() => {
-        const calloutsGroup = svg.append("g").attr("class", "callouts");
+    const calloutsGroup = svg.append("g").attr("class", "callouts");
     
     smallStatesConfig.forEach(config => {
         // Find the state feature
@@ -309,10 +292,9 @@ function drawCallouts(svg, states, projection) {
         });
         
         // Update callout colors after creating the callout
-        requestAnimationFrame(() => {
+        setTimeout(() => {
             updateCalloutColors();
-        });
-    });
+        }, 100);
     });
 }
 
@@ -387,10 +369,8 @@ d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(function
         .attr("class", "state-borders")
         .attr("d", path);
     
-    // Lazy load callouts after main map renders
-    setTimeout(() => {
-        drawCallouts(svg, topojson.feature(us, us.objects.states).features, projection);
-    }, 100);
+    // Draw callouts for small East Coast states
+    drawCallouts(svg, topojson.feature(us, us.objects.states).features, projection);
     
     // Load customer data after map is ready
     loadCustomerData().then(() => {
