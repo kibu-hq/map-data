@@ -351,19 +351,9 @@ function addCustomerPins() {
         return projected !== null;
     });
     
-    // Debug: Log Maine customers specifically
-    const maineCustomers = validCustomers.filter(d => d.state === 'ME');
-    console.log(`DEBUG: Found ${maineCustomers.length} Maine customers:`, maineCustomers);
-    
-    // Use proper D3 data join pattern to handle updates and prevent duplicates
-    const pins = svg.selectAll(".customer-pin")
-        .data(validCustomers, d => d.id); // Use id as key to prevent duplicates
-    
-    // Remove any existing pins that are no longer in the data
-    pins.exit().remove();
-    
-    // Add new pins - all customers get identical pins
-    pins.enter().append("circle")
+    svg.selectAll(".customer-pin")
+        .data(validCustomers)
+        .enter().append("circle")
         .attr("class", "customer-pin")
         .attr("cx", d => {
             const projected = projection([d.lng, d.lat]);
@@ -379,10 +369,6 @@ function addCustomerPins() {
         .attr("stroke-width", 1)
         .style("opacity", 0.95)
         .style("pointer-events", "none");
-        
-    // Debug: Count total pins after creation
-    const totalPins = svg.selectAll(".customer-pin").size();
-    console.log(`DEBUG: Total pins created: ${totalPins}`);
 }
 
 // Update callout colors based on customer data
