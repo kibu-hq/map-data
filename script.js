@@ -313,6 +313,11 @@ async function loadCustomerData() {
             return counts;
         }, {});
         
+        // Log summary statistics
+        const numberOfStates = Object.keys(stateCounts).length;
+        const totalCustomers = customerData.length;
+        console.log(`Map loaded: ${numberOfStates} states with customers, ${totalCustomers} total customers`);
+        
         addCustomerPins();
         
         // Update state colors if map exists
